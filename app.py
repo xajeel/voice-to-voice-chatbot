@@ -3,8 +3,7 @@ import whisper
 from groq import Groq
 from gtts import gTTS
 import os
-import tempfile
-from streamlit_webrtc import webrtc_streamer, WebRtcMode, ClientSettings
+from streamlit_mic_recorder import mic_recorder
 
 # Get the Groq API key from Streamlit secrets
 GROQ_API = st.secrets["groq"]["api_key"]
@@ -30,63 +29,49 @@ def text_to_speech(text, output='response.mp3'):
     tts.save(output)
     return output
 
-# Function to record audio using streamlit_webrtc
-def record_audio():
-    webrtc_ctx = webrtc_streamer(
-        key="audio",
-        mode=WebRtcMode.SENDONLY,
-        client_settings=ClientSettings(
-            media_stream_constraints={"audio": True, "video": False},
-        ),
-    )
-    return webrtc_ctx
-
 # Main Streamlit app
 def main():
     st.title("Voice-to-Voice Chatbot")
-    st.write("You can either record your voice or upload an audio file, and the app will transcribe, respond, and convert the response to speech.")
+    st.write("Record your voice or upload an audio file to interact with the chatbot.")
 
     # Option to record audio or upload a file
-    option = st.radio("Choose an option:", ("Record Voice", "Upload MP3 File"))
+    option = st.radio("Choose an option:", ("Record Audio", "Upload Audio File"))
 
     audio_file = None
-    if option == "Record Voice":
-        # Record audio
-        st.write("Record your voice:")
-        webrtc_ctx = record_audio()
-        if webrtc_ctx.audio_receiver:
-            audio_data = webrtc_ctx.audio_receiver.get_audio()
-            # Save audio to a temporary file
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
-                tmp_file.write(audio_data)
-                audio_file = tmp_file.name
 
-    elif option == "Upload MP3 File":
-        # Upload audio file
-        st.write("Upload an MP3 file:")
-        audio_file = st.file_uploader("Upload an audio file", type=["mp3", "wav", "m4a"])
+    if option == "Record Audio":
+        # Use streamlit-mic-recorder to record audio
+        audio = mic_recorder(
+            start_prompt="Start recording",
+            stop_prompt="Stop recording",
+            just_once=False,
+            use_container_width=False
+        )
+        if audio is not None:
+            with open("recorded_audio.wav", "wb") as f:
+                f.write(audio)
+            audio_file = "recorded_audio.wav"
+
+    elif option == "Upload Audio File":
+        # Use file uploader to upload an audio file
+        uploaded_file = st.file_uploader("Upload an audio file", type=["mp3", "wav", "m4a"])
+        if uploaded_file is not None:
+            audio_file = uploaded_file
 
     if audio_file is not None:
-        # Save the audio file temporarily
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
-            tmp_file.write(audio_file.read())
-            tmp_file.close()
+        st.write("Transcribing audio...")
+        transcribed_text = whisper_transcribe(audio_file)
+        st.write(f"Transcribed Text: {transcribed_text}")
 
-            # Transcribe the audio file using Whisper
-            st.write("Transcribing audio...")
-            transcribed_text = whisper_transcribe(tmp_file.name)
-            st.write(f"Transcribed Text: {transcribed_text}")
+        st.write("Generating response...")
+        response_text = generate_response(transcribed_text)
+        st.write("Response from the chatbot:")
+        st.text_area("LLM Output", response_text, height=150)
 
-            # Generate a response using Groq API
-            st.write("Generating response...")
-            response_text = generate_response(transcribed_text)
-            st.write(f"Response: {response_text}")
-
-            # Convert the response to speech
-            st.write("Converting response to speech...")
-            response_audio_file = text_to_speech(response_text)
-            audio_bytes = open(response_audio_file, "rb").read()
-            st.audio(audio_bytes, format="audio/mp3")
+        st.write("Converting response to speech...")
+        speech_file = text_to_speech(response_text)
+        audio_bytes_response = open(speech_file, "rb").read()
+        st.audio(audio_bytes_response, format="audio/mp3")
 
 if __name__ == "__main__":
     main()
