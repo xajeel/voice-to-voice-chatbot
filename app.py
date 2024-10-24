@@ -4,6 +4,7 @@ from groq import Groq
 from gtts import gTTS
 import os
 import tempfile
+from streamlit_webrtc import webrtc_streamer, WebRtcMode, ClientSettings
 
 # Get the Groq API key from Streamlit secrets
 GROQ_API = st.secrets["groq"]["api_key"]
@@ -29,6 +30,17 @@ def text_to_speech(text, output='response.mp3'):
     tts.save(output)
     return output
 
+# Function to record audio using streamlit_webrtc
+def record_audio():
+    webrtc_ctx = webrtc_streamer(
+        key="audio",
+        mode=WebRtcMode.SENDONLY,
+        client_settings=ClientSettings(
+            media_stream_constraints={"audio": True, "video": False},
+        ),
+    )
+    return webrtc_ctx
+
 # Main Streamlit app
 def main():
     st.title("Voice-to-Voice Chatbot")
@@ -41,7 +53,14 @@ def main():
     if option == "Record Voice":
         # Record audio
         st.write("Record your voice:")
-        audio_file = st.audio_recorder(format="audio/wav")
+        webrtc_ctx = record_audio()
+        if webrtc_ctx.audio_receiver:
+            audio_data = webrtc_ctx.audio_receiver.get_audio()
+            # Save audio to a temporary file
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
+                tmp_file.write(audio_data)
+                audio_file = tmp_file.name
+
     elif option == "Upload MP3 File":
         # Upload audio file
         st.write("Upload an MP3 file:")
