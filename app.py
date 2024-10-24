@@ -47,16 +47,22 @@ def main():
             just_once=False,
             use_container_width=False
         )
-        if audio and audio['audio'] is not None:
+
+        if audio and 'audio' in audio and audio['audio'] is not None:
             audio_file = audio['audio']
             with open("recorded_audio.wav", "wb") as f:
                 f.write(audio['audio'])  # Ensure we're writing the bytes
+            st.success("Audio recorded successfully!")
+
+        elif audio and 'audio' not in audio:
+            st.warning("Recording not completed yet. Please try again.")
 
     elif option == "Upload Audio File":
         # Use file uploader to upload an audio file
         uploaded_file = st.file_uploader("Upload an audio file", type=["mp3", "wav", "m4a"])
         if uploaded_file is not None:
             audio_file = uploaded_file
+            st.success("Audio file uploaded successfully!")
 
     if audio_file is not None:
         st.write("Transcribing audio...")
