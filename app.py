@@ -47,10 +47,10 @@ def main():
             just_once=False,
             use_container_width=False
         )
-        if audio is not None:
+        if audio and audio['audio'] is not None:
+            audio_file = audio['audio']
             with open("recorded_audio.wav", "wb") as f:
-                f.write(audio)
-            audio_file = "recorded_audio.wav"
+                f.write(audio['audio'])  # Ensure we're writing the bytes
 
     elif option == "Upload Audio File":
         # Use file uploader to upload an audio file
